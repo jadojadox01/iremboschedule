@@ -31,6 +31,7 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
   const [scheduleFilter, setScheduleFilter] = useState("active");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [siteFilter, setSiteFilter] = useState("all");
+  const [isFetching, setIsFetching] = useState(false);
 
   const remainingSlots = useMemo(
     () =>
@@ -126,35 +127,48 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
   }, [categoryFilter, changes, scheduleFilter, schedules, siteFilter, status]);
 
   async function refresh() {
-    const [statusResponse, schedulesResponse, changesResponse] = await Promise.all([
-      fetch("/api/status"),
-      fetch("/api/schedules"),
-      fetch("/api/changes?limit=200")
-    ]);
+    setIsFetching(true);
+    try {
+      const [statusResponse, schedulesResponse, changesResponse] = await Promise.all([
+        fetch("/api/status"),
+        fetch("/api/schedules"),
+        fetch("/api/changes?limit=200")
+      ]);
 
-    const [nextStatus, nextSchedules, nextChanges] = await Promise.all([
-      statusResponse.json(),
-      schedulesResponse.json(),
-      changesResponse.json()
-    ]);
+      const [nextStatus, nextSchedules, nextChanges] = await Promise.all([
+        statusResponse.json(),
+        schedulesResponse.json(),
+        changesResponse.json()
+      ]);
 
-    setStatus(nextStatus);
-    setSchedules(nextSchedules.schedules || []);
-    setChanges(nextChanges.changes || []);
+      setStatus(nextStatus);
+      setSchedules(nextSchedules.schedules || []);
+      setChanges(nextChanges.changes || []);
+    } finally {
+      setIsFetching(false);
+    }
   }
 
   useEffect(() => {
-    const interval = setInterval(refresh, 30000);
-    return () => clearInterval(interval);
+    refresh();
+    const interval = setInterval(refresh, 10000);
+    const handleFocus = () => refresh();
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   return (
     <main className="min-h-screen bg-[#f7f9fb] px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-teal-700">Monitoring only</p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-950">
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950 sm:text-3xl">
               Irembo Schedule Availability Monitor
             </h1>
           </div>
@@ -217,18 +231,18 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
                 New detected codes for Busanza
               </p>
               <p className="mt-1 text-sm text-slate-700">
-                {busanzaSchedules.length} Busanza schedules currently detected.{" "}
+                {busanzaSchedules.length} Busanza schedules currently detected. {" "}
                 {busanzaCategoryASchedules.length} are Category A priority matches.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <button
                 onClick={() => {
                   setScheduleFilter("active");
                   setCategoryFilter("all");
                   setSiteFilter(status?.monitor?.priority?.center || "BUSANZA AUTOMATED CENTER");
                 }}
-                className="inline-flex h-10 items-center justify-center rounded border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100"
+                className="inline-flex h-10 w-full items-center justify-center rounded border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 sm:w-auto"
               >
                 Show Busanza
               </button>
@@ -238,7 +252,7 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
                   setCategoryFilter(status?.monitor?.priority?.category || "A");
                   setSiteFilter(status?.monitor?.priority?.center || "BUSANZA AUTOMATED CENTER");
                 }}
-                className="inline-flex h-10 items-center justify-center rounded border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+                className="inline-flex h-10 w-full items-center justify-center rounded border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white transition hover:bg-teal-800 sm:w-auto"
               >
                 Show Busanza A
               </button>
@@ -249,8 +263,13 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(360px,0.8fr)]">
           <div>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold text-slate-950">Schedules</h2>
-              <div className="flex rounded border border-slate-200 bg-white p-1">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Schedules</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Live updates every 10 seconds while this page is open.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 rounded border border-slate-200 bg-white p-1">
                 {[
                   ["active", "Current", schedules.length],
                   ["changed", "Changed", changes.filter((change) => change.type !== "REMOVED_SCHEDULE").length],
@@ -270,7 +289,7 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
                 ))}
               </div>
             </div>
-            <div className="mb-3 grid gap-2 rounded border border-slate-200 bg-white p-3 sm:grid-cols-2">
+            <div className="mb-3 grid gap-3 rounded border border-slate-200 bg-white p-3 sm:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
                 Category
                 <select
@@ -303,7 +322,46 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
                 </select>
               </label>
             </div>
-            <div className="overflow-hidden rounded border border-slate-200 bg-white">
+            <div className="mb-4 overflow-hidden rounded border border-slate-200 bg-white sm:hidden">
+              {scheduleRows.length === 0 ? (
+                <div className="px-4 py-6 text-center text-slate-500">No rows for this filter.</div>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {scheduleRows.map((schedule) => (
+                    <article key={schedule.scheduleId} className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{schedule.center || "Unknown"}</p>
+                          <p className="mt-0.5 text-sm text-slate-600">{schedule.location || "Unknown"}</p>
+                        </div>
+                        <StatusPill tone={schedule.rowType === "REMOVED" ? "warn" : "neutral"}>
+                          {schedule.rowType}
+                        </StatusPill>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-slate-900">Category</span>
+                          <span>{schedule.category || "-"}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-slate-900">Start</span>
+                          <span>{formatDate(schedule.startDateTime)}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-slate-900">Capacity</span>
+                          <span>{schedule.remainingCapacity ?? "-"} / {schedule.maximumCapacity ?? "-"}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-slate-900">Last seen</span>
+                          <span>{formatDate(schedule.lastSeen)}</span>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="overflow-hidden rounded border border-slate-200 bg-white hidden sm:block">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
@@ -350,9 +408,11 @@ export default function Dashboard({ initialStatus, initialSchedules, initialChan
           </div>
 
           <aside>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-950">Change logs</h2>
-              <StatusPill>{changes.length} latest</StatusPill>
+            <div className="sticky top-4 z-10 mb-3 rounded-b border-b border-slate-200 bg-[#f7f9fb] px-4 py-3 sm:static sm:border-none sm:bg-transparent sm:px-0 sm:py-0">
+              <div className="flex items-center justify-between gap-4 sm:block">
+                <h2 className="text-base font-semibold text-slate-950">Change logs</h2>
+                <StatusPill>{changes.length} latest</StatusPill>
+              </div>
             </div>
             <div className="rounded border border-slate-200 bg-white">
               {changes.length === 0 ? (
