@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Schedule {
+  scheduleId        String   @id
+  center            String?
+  location          String?
+  category          String?
+  startDateTime     DateTime?
+  endDateTime       DateTime?
+  remainingCapacity Int?
+  maximumCapacity   Int?
+  lastSeen          DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Snapshot {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+}
+
+model Change {
+  id         Int      @id @default(autoincrement())
+  scheduleId String
+  type       String
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+}
