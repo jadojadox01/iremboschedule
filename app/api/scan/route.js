@@ -3,6 +3,14 @@ import { logger } from "../../../lib/logger.js";
 
 export async function POST(request) {
   try {
+    const scanSecret = process.env.SCAN_API_SECRET;
+    if (scanSecret) {
+      const providedSecret = request.headers.get("x-scan-secret");
+      if (providedSecret !== scanSecret) {
+        return Response.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+      }
+    }
+
     const body = await request.json().catch(() => ({}));
     const result = await runScan(body);
     return Response.json(result);

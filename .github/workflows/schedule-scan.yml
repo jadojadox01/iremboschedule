@@ -1,0 +1,20 @@
+name: Scheduled Scan
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
+      SCAN_API_SECRET: ${{ secrets.SCAN_API_SECRET }}
+    steps:
+      - name: Send scheduled scan request
+        run: |
+          curl -X POST "https://$WEBSITE_URL/api/scan" \
+            -H "x-scan-secret: $SCAN_API_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}'
