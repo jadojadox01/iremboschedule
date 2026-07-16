@@ -7,9 +7,10 @@
   "scripts": {
     "dev": "node scripts/devWithWorker.js",
     "next:dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "scan": "node worker/scheduler.js --once",
